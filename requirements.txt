@@ -1,0 +1,7 @@
+bottle # webserver
+jsonpickle # to send complex datatypes
+numpy # for mathematical computations
+pandas # for dataframes
+functools
+scipy.stats
+pyyaml # to read config file
