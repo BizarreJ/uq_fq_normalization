@@ -1,2 +1,2 @@
 uq_q_normalization:
-        normalization: quantile
+        normalization: upper quartile

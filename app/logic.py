@@ -108,99 +108,78 @@ class AppLogic:
                 state = state_local_computation
 
             if state == state_local_computation:
+                self.progress = 'local computation'
                 if self.mode == "quantile":
                     print("Start Quantile Normalization")
                     print("Local mean computation", flush=True)
-                    self.progress = 'local computation'
                     self.client.q_compute_local_means()
 
                     data_to_send = jsonpickle.encode(self.client.local_means)
-
-                    if self.coordinator:
-                        self.data_incoming.append(data_to_send)
-                        state = state_global_aggregation
-                    else:
-                        self.data_outgoing = data_to_send
-                        self.status_available = True
-                        state = state_wait_for_aggregation
-                        print(f'[CLIENT] Sending local means data to coordinator', flush=True)
-                
-
-                    if state == state_wait_for_aggregation:
-                        print("Wait for aggregation", flush=True)
-                        self.progress = 'wait for aggregation'
-                        if len(self.data_incoming) > 0:
-                            print("Received global means from coordinator.", flush=True)
-                            global_means = jsonpickle.decode(self.data_incoming[0])
-                            self.data_incoming = []
-                            self.client.q_set_global_means(global_means)
-                            state = state_local_result_computation
-
-                    if state == state_global_aggregation:
-                        print("Global computation", flush=True)
-                        self.progress = 'global aggregation...'
-                        if len(self.data_incoming) == len(self.clients):
-                            local_means = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
-                            self.data_incoming = []
-                            global_means = self.client.q_compute_global_means(local_means)
-                            self.client.q_set_global_means(global_means)
-                            data_to_broadcast = jsonpickle.encode(global_means)
-                            self.data_outgoing = data_to_broadcast
-                            self.status_available = True
-                            state = state_local_result_computation
-                            print(f'[COORDINATOR] Broadcasting global mean to clients', flush=True)
-
-                    if state == state_local_result_computation:
-                        print("Calculating results..", flush=True)
-                        self.client.q_compute_local_result()
-                        state = state_writing_results
-
-                if self.mode == "upper quartile":
+                elif self.mode == "upper quartile":
                     print("Start Upper Quartile Normalization")
                     print("Local zero computation", flush=True)
-                    self.progress = 'local computation'
                     self.client.uq_compute_local_zeros()
-
+                
                     data_to_send = jsonpickle.encode(self.client.local_zeros)
 
-                    if self.coordinator:
-                        self.data_incoming.append(data_to_send)
-                        state = state_global_aggregation
-                    else:
-                        self.data_outgoing = data_to_send
-                        self.status_available = True
-                        state = state_wait_for_aggregation
+                if self.coordinator:
+                    self.data_incoming.append(data_to_send)
+                    state = state_global_aggregation
+                else:
+                    self.data_outgoing = data_to_send
+                    self.status_available = True
+                    state = state_wait_for_aggregation
+                    if self.mode == "quantile":
+                        print(f'[CLIENT] Sending local means data to coordinator', flush=True)
+                    elif self.mode == "upper quartile":
                         print(f'[CLIENT] Sending local zero lines to coordinator', flush=True)
 
-                    if state == state_wait_for_aggregation:
-                        print("Wait for aggregation", flush=True)
-                        self.progress = 'wait for aggregation'
-                        if len(self.data_incoming) > 0:
-                            print("Received global zero lines from coordinator.", flush=True)
-                            global_zeros = jsonpickle.decode(self.data_incoming[0])
-                            self.data_incoming = []
-                            self.client.uq_set_global_zeros(global_zeros)
-                            state = state_local_result_computation
+            if state == state_wait_for_aggregation:
+                print("Wait for aggregation", flush=True)
+                self.progress = 'wait for aggregation'
+                if len(self.data_incoming) > 0:
+                    if self.mode == "quantile":
+                        print("Received global means from coordinator.", flush=True)
+                        global_means = jsonpickle.decode(self.data_incoming[0])
+                        self.client.q_set_global_means(global_means)
+                    elif self.mode == "upper quartile":
+                        print("Received global zero lines from coordinator.", flush=True)
+                        global_zeros = jsonpickle.decode(self.data_incoming[0])
+                        self.client.uq_set_global_zeros(global_zeros)
+                    self.data_incoming = []
+                    state = state_local_result_computation
 
-                    if state == state_global_aggregation:
-                        print("Global computation", flush=True)
-                        self.progress = 'global aggregation...'
-                        if len(self.data_incoming) == len(self.clients):
-                            local_zeros = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
-                            self.data_incoming = []
-                            global_zeros = self.client.uq_compute_global_zeros(local_zeros)
-                            self.client.uq_set_global_zeros(global_zeros)
-                            data_to_broadcast = jsonpickle.encode(global_zeros)
-                            self.data_outgoing = data_to_broadcast
-                            self.status_available = True
-                            state = state_local_result_computation
-                            print(f'[COORDINATOR] Broadcasting global zero lines to clients', flush=True)
+            if state == state_global_aggregation:
+                print("Global computation", flush=True)
+                self.progress = 'global aggregation...'
+                if len(self.data_incoming) == len(self.clients):
+                    if self.mode == "quantile":
+                        local_means = [jsonpickle.decode(client_data) for client_data in self.data_incoming]                   
+                        global_means = self.client.q_compute_global_means(local_means)
+                        self.client.q_set_global_means(global_means)
+                        data_to_broadcast = jsonpickle.encode(global_means)
+                    elif self.mode == "upper quartile":
+                        local_zeros = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
+                        global_zeros = self.client.uq_compute_global_zeros(local_zeros)
+                        self.client.uq_set_global_zeros(global_zeros)
+                        data_to_broadcast = jsonpickle.encode(global_zeros)
+                    self.data_incoming = []
+                    self.data_outgoing = data_to_broadcast
+                    self.status_available = True
+                    state = state_local_result_computation
+                    if self.mode == "quantile":
+                        print(f'[COORDINATOR] Broadcasting global mean to clients', flush=True)
+                    elif self.mode == "upper quartile":
+                        print(f'[COORDINATOR] Broadcasting global zero lines to clients', flush=True)
 
-                    if state == state_local_result_computation:
-                        print("Calculating results..", flush=True)
-                        self.client.uq_compute_local_result()
-    
-                        data_to_send = jsonpickle.encode(self.client.local_result)
+            if state == state_local_result_computation:
+                print("Calculating results..", flush=True)
+                if self.mode == "quantile":
+                    self.client.q_compute_local_result()
+                    state = state_writing_results
+                elif self.mode == "upper quartile":
+                    self.client.uq_compute_local_result()
+                    data_to_send = jsonpickle.encode(self.client.local_result)
 
                     if self.coordinator:
                         self.data_incoming.append(data_to_send)
@@ -211,30 +190,29 @@ class AppLogic:
                         state = state_second_wait_for_aggregation
                         print(f'[CLIENT] Sending local result to coordinator', flush=True)
 
-                    if state == state_second_wait_for_aggregation:
-                        print("Wait for aggregation", flush=True)
-                        self.progress = 'wait for aggregation'
-                        if len(self.data_incoming) > 0:
-                            print("Received global result from coordinator.", flush=True)
-                            global_result = jsonpickle.decode(self.data_incoming[0])
-                            self.data_incoming = []
-                            self.client.uq_set_global_result(global_result)
-                            state = state_writing_results
+            if state == state_second_wait_for_aggregation:
+                print("Wait for another aggregation", flush=True)
+                self.progress = 'wait for second aggregation'
+                if len(self.data_incoming) > 0:
+                    print("Received global result from coordinator.", flush=True)
+                    global_result = jsonpickle.decode(self.data_incoming[0])
+                    self.data_incoming = []
+                    self.client.uq_set_global_result(global_result)
+                    state = state_writing_results
 
-                    if state == state_global_aggregation:
-                        print("Global computation", flush=True)
-                        self.progress = 'global aggregation...'
-                        if len(self.data_incoming) == len(self.clients):
-                            local_result = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
-                            self.data_incoming = []
-                            global_result = self.client.uq_compute_global_result(local_result)
-                            self.client.uq_set_global_result(global_result)
-                            data_to_broadcast = jsonpickle.encode(global_result)
-                            self.data_outgoing = data_to_broadcast
-                            self.status_available = True
-                            state = state_writing_results
-                            print(f'[COORDINATOR] Broadcasting global result to clients', flush=True)
-
+            if state == state_global_result_computation:
+                print("Global computation of the result", flush=True)
+                self.progress = 'global result computation...'
+                if len(self.data_incoming) == len(self.clients):
+                    local_result = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
+                    self.data_incoming = []
+                    global_result = self.client.uq_compute_global_result(local_result)
+                    self.client.uq_set_global_result(global_result)
+                    data_to_broadcast = jsonpickle.encode(global_result)
+                    self.data_outgoing = data_to_broadcast
+                    self.status_available = True
+                    state = state_writing_results
+                    print(f'[COORDINATOR] Broadcasting global result to clients', flush=True)
 
             if state == state_writing_results:
                 print("Writing results", flush=True)

@@ -84,5 +84,5 @@ class Coordinator(Client):
         return reduce(np.intersect1d, local_zeros)
     
     def uq_compute_global_result(self,local_result):
-        globel_result = local_result/(np.exp(np.mean(np.log(local_result))))
+        global_result = local_result/(np.exp(np.mean(np.log(local_result))))
         return global_result
