@@ -84,8 +84,9 @@ class AppLogic:
         state_global_aggregation = 6
         state_second_wait_for_aggregation = 7
         state_global_result_computation = 8
-        state_writing_results = 9
-        state_finishing = 10
+        state_set_local_result = 9
+        state_writing_results = 10
+        state_finishing = 11
 
         # Initial state
         state = state_initializing
@@ -173,11 +174,12 @@ class AppLogic:
                         print(f'[COORDINATOR] Broadcasting global zero lines to clients', flush=True)
 
             if state == state_local_result_computation:
-                print("Calculating results..", flush=True)
                 if self.mode == "quantile":
+                    print("Calculating results..", flush=True)
                     self.client.q_compute_local_result()
                     state = state_writing_results
                 elif self.mode == "upper quartile":
+                    print("Calculating local norm factors..", flush=True)
                     self.client.uq_compute_local_result()
                     data_to_send = jsonpickle.encode(self.client.local_result)
 
@@ -188,17 +190,17 @@ class AppLogic:
                         self.data_outgoing = data_to_send
                         self.status_available = True
                         state = state_second_wait_for_aggregation
-                        print(f'[CLIENT] Sending local result to coordinator', flush=True)
+                        print(f'[CLIENT] Sending local norm factors to coordinator', flush=True)
 
             if state == state_second_wait_for_aggregation:
-                print("Wait for another aggregation", flush=True)
+                print("Wait for the second aggregation", flush=True)
                 self.progress = 'wait for second aggregation'
                 if len(self.data_incoming) > 0:
                     print("Received global result from coordinator.", flush=True)
                     global_result = jsonpickle.decode(self.data_incoming[0])
                     self.data_incoming = []
                     self.client.uq_set_global_result(global_result)
-                    state = state_writing_results
+                    state = state_set_local_result
 
             if state == state_global_result_computation:
                 print("Global computation of the result", flush=True)
@@ -211,8 +213,13 @@ class AppLogic:
                     data_to_broadcast = jsonpickle.encode(global_result)
                     self.data_outgoing = data_to_broadcast
                     self.status_available = True
-                    state = state_writing_results
+                    state = state_set_local_result
                     print(f'[COORDINATOR] Broadcasting global result to clients', flush=True)
+
+            if state == state_set_local_result:
+                print("Calculating results..", flush=True)
+                self.client.uq_set_local_result(self.id)
+                state = state_writing_results
 
             if state == state_writing_results:
                 print("Writing results", flush=True)

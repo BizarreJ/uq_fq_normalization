@@ -14,6 +14,7 @@ class Client:
     local_zeros = None
     global_zeros = None
     local_result = None
+    global_result = None
     result = None
 
     def __init__(self):
@@ -67,13 +68,19 @@ class Client:
         lib_size = np.array(data.sum(axis=0).tolist())
         uquartile = np.quantile(data,0.75,axis=0)
         self.local_result = uquartile/lib_size
+        print(f'Local result: {self.local_result}', flush=True)
+
+    def uq_set_local_result(self, client_id):
+        print("Client ID: ", client_id) #TODO: delete this, its only for debugging
+        self.result = self.global_result[int(client_id)]
 
     def uq_set_global_zeros(self, global_zeros):
         self.global_zeros = global_zeros
         print(f'Global zeros in lines: {self.global_zeros}', flush=True)
 
     def uq_set_global_result(self, global_result):
-        self.result = global_result
+        self.global_result = global_result
+        print(f'Global result: {self.global_result}', flush=True)
 
 
 class Coordinator(Client):
