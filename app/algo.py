@@ -56,13 +56,27 @@ class Client:
 
 #---------------------------------------------------------------------------
     
+    #Checks which lines of the client's input_data are completely zero.
     def uq_compute_local_zeros(self):
+        if(self.input_data.isnull().values.any()):
+            print("Error in Upper Quartile function: the function can't handle NaNs in input data.", flush=True)
+            exit()
         all_zero = self.input_data.eq(0).all(axis=1)
         self.local_zeros = np.where(all_zero)[0]
         print(f'Local zeros of this client in lines: {self.local_zeros}', flush=True)
 
+    #Calculates for each sample of the client the upper quartile by library size factor.
+    #The implementation is based on the implementation of the 
+    #calcNormFactors method in bioconductor edgeR. 
+    #Robinson and Smyth, 2020
     def uq_compute_local_result(self):
         self.input_data.drop(axis=1, index=self.global_zeros, inplace=True)
+        
+        n,m = input_data.shape
+        if n == 1:
+            print("Error in Upper Quartile function: There are too few lines left after removing the zeros.")
+            exit()
+
         data = pd.DataFrame(np.sort(self.input_data,axis=0))
     
         lib_size = np.array(data.sum(axis=0).tolist())
@@ -86,10 +100,12 @@ class Client:
 class Coordinator(Client):
     def q_compute_global_means(self, local_means):
         return np.sum(local_means,axis=0)/len(local_means)
-
+    
+    #Collects the zero lines of the clients and 
+    #reduces them to the lines that are present in each client.
     def uq_compute_global_zeros(self, local_zeros):
         return reduce(np.intersect1d, local_zeros)
     
+    #Calculates the global result
     def uq_compute_global_result(self,local_result):
-        global_result = local_result/(np.exp(np.mean(np.log(local_result))))
-        return global_result
+        return local_result/(np.exp(np.mean(np.log(local_result))))
