@@ -180,8 +180,8 @@ class AppLogic:
                     state = state_writing_results
                 elif self.mode == "upper quartile":
                     print("Calculating local norm factors..", flush=True)
-                    self.client.uq_compute_local_result()
-                    data_to_send = jsonpickle.encode(self.client.local_result)
+                    self.client.uq_compute_uqfactor()
+                    data_to_send = jsonpickle.encode(self.client.uqfactor)
 
                     if self.coordinator:
                         self.data_incoming.append(data_to_send)
@@ -218,7 +218,7 @@ class AppLogic:
 
             if state == state_set_local_result:
                 print("Calculating results..", flush=True)
-                self.client.uq_set_local_result(self.id)
+                self.client.uq_compute_local_result(self.id)
                 state = state_writing_results
 
             if state == state_writing_results:
