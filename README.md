@@ -13,10 +13,10 @@ Example:
 
 * A config.yml file to define, which normalization method should use.  
 Possibilities:  
- * uq_q_normalization:  
+uq_q_normalization:  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalization: upper quartile  
 or  
- * uq_q_normalization:  
+uq_q_normalization:  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalization: quantile
 
 ## Output
