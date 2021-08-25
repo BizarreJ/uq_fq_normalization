@@ -1,12 +1,21 @@
 # Federated UQ and Q Normalization FeatureCloud App
 
 ## Description
+A Normalization FeatureCloud App, allowing to perform Quantile or Upper Quartile Normalization in a federated manner.
 
 ## Input
+A read count matrix in a .csv file. Separator has to be a comma.
+Example:
+2,4,4,0
+0,8,6,9
+3,9,3,5
+1,3,8,2
 
 ## Output
+A matrix with normalized read counts.
 
 ## Workflows
+This is a standalone App at the moment.
 
 ## How to test it with FeatureCloud
 0. You need a Docker Installation on your computer.
