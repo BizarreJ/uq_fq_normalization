@@ -180,7 +180,7 @@ class AppLogic:
                     state = state_writing_results
                 elif self.mode == "upper quartile":
                     print("Calculating local norm factors..", flush=True)
-                    self.client.uq_compute_uqfactor()
+                    self.client.uq_compute_uqfactor(self.id)
                     data_to_send = jsonpickle.encode(self.client.uqfactor)
 
                     if self.coordinator:
@@ -206,7 +206,10 @@ class AppLogic:
                 print("Global computation of the result", flush=True)
                 self.progress = 'global result computation...'
                 if len(self.data_incoming) == len(self.clients):
-                    local_result = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
+                    #local_result = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
+                    local_result = {}
+                    for client_data in self.data_incoming:
+                        local_result.update(jsonpickle.decode(client_data))
                     self.data_incoming = []
                     global_result = self.client.uq_compute_global_result(local_result)
                     self.client.uq_set_global_result(global_result)
@@ -218,7 +221,7 @@ class AppLogic:
 
             if state == state_set_local_result:
                 print("Calculating results..", flush=True)
-                self.client.uq_compute_local_result(self.id)
+                self.client.uq_compute_local_result()
                 state = state_writing_results
 
             if state == state_writing_results:

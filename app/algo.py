@@ -22,6 +22,7 @@ class Client:
 
     local_zeros = None
     global_zeros = None
+    client_id = None
     uqfactor = None
     global_result = None
     result = None
@@ -139,7 +140,7 @@ class Client:
     #The implementation is based on the implementation of the 
     #calcNormFactors method in bioconductor edgeR. 
     #Robinson and Smyth, 2020
-    def uq_compute_uqfactor(self):
+    def uq_compute_uqfactor(self, client_id):
         self.input_data.drop(axis=1, index=self.global_zeros, inplace=True)
         
         n,m = self.input_data.shape
@@ -148,16 +149,17 @@ class Client:
             exit()
 
         data = pd.DataFrame(np.sort(self.input_data,axis=0))
+        self.client_id = client_id
     
         lib_size = np.array(data.sum(axis=0).tolist())
         uquartile = np.quantile(data,0.75,axis=0)
-        self.uqfactor = uquartile/lib_size
+        self.uqfactor = {client_id: uquartile/lib_size}
         print(f'Local result: {self.uqfactor}', flush=True)
 
     #Compute the local result.
-    def uq_compute_local_result(self, client_id):
-        print("Client ID: ", client_id) #TODO: delete this, its only for debugging
-        self.result = self.global_result[int(client_id)]
+    def uq_compute_local_result(self):
+        norm_factors = self.global_result[self.client_id]
+        self.result = self.input_data/norm_factors
 
     #Set the global zeros vector.
     def uq_set_global_zeros(self, global_zeros):
@@ -187,5 +189,17 @@ class Coordinator(Client):
         return reduce(np.intersect1d, local_zeros)
     
     #Calculates the global result
-    def uq_compute_global_result(self,local_result):
-        return local_result/(np.exp(np.mean(np.log(local_result))))
+    def uq_compute_global_result(self,total_dict):
+        keys = list(total_dict.keys())
+        result = []
+        for k in keys:
+            result.append(total_dict.get(k))
+        result = result/(np.exp(np.mean(np.log(result))))
+        for i in range(len(total_dict)):
+            total_dict[keys[i]] = result[i]
+        return total_dict
+
+
+
+
+
