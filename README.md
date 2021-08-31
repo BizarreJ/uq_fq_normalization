@@ -11,13 +11,10 @@ Example:
 3,9,3,5  
 1,3,8,2  
 
-* A config.yml file to define, which normalization method should use.  
-Possibilities:  
-uq_q_normalization:  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalization: upper quartile  
-or  
-uq_q_normalization:  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalization: quantile
+* A config.yml file to customize some things (see below the possibilities):  
+  * which normalization method you want to use  
+  * which name the input file has
+
 
 ## Output
 A matrix with normalized read counts.
@@ -34,3 +31,12 @@ This is a standalone App at the moment.
 5. now you can go on the FeatureCloud Website to *For Developer -> Testing* and create a new test.
 6. The image name is the *name* from 4.. Choose 2 clients for the beginning. There is some sample data for testing in this repository. Complete the paths for Client 1 and 2 for example with *uq_q_normalization/sample_data/client1/* and *uq_q_normalization/sample_data/client2/* or whatever your path to your sample data is. The other settings can remain as they are for now.
 7. Click start. It will take a few seconds, than you can see the app work. After another few seconds, the status on the top changes to "Finished" and you can download the results of each client.
+
+## Config
+For an example config file look at config.yml.
+
+Use the config file to customize things. Just upload it together with your data as `config.yml`
+```
+uq_q_normalization:
+    normalization: upper quartile # upper quartile or quantile, upper quartile is default
+    input_filename: "client.csv"" # name of your input file, don't forget the .csv at the end; default is data.csv
