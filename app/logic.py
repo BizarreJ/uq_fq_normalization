@@ -41,6 +41,9 @@ class AppLogic:
 
         self.client = None
         self.mode = None
+        self.input_name = None
+        #self.sample_names = None
+        #self.gene_names = None
 
     def handle_setup(self, client_id, coordinator, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
@@ -70,7 +73,10 @@ class AppLogic:
         with open("/mnt/input/config.yml") as f:
             config = yaml.load(f, Loader=yaml.FullLoader)[APP_NAME]
 
-            self.mode = config.get("normalization")
+            self.mode = config.get("normalization", "upper quartile")
+            self.input_name = config.get("input_filename", "data.csv")
+            #self.sample_names = config.get("sample_names")
+            #self.gene_names = config.get("gene_names")
 
     def app_flow(self):
         # This method contains a state machine for the client and coordinator instance
@@ -105,7 +111,7 @@ class AppLogic:
             if state == state_read_input:
                 print("Read input", flush=True)
                 self.progress = 'read input'
-                self.client.read_input()
+                self.client.read_input(self.input_name)
                 state = state_local_computation
 
             if state == state_local_computation:

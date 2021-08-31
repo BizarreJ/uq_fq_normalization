@@ -6,8 +6,8 @@ from functools import reduce
 from scipy.stats import rankdata
 from scipy import interpolate
 
-INPUT_PATH = "/mnt/input/data.csv"
-OUTPUT_PATH = "/mnt/output/result.txt"
+INPUT_PATH = "/mnt/input/"
+OUTPUT_PATH = "/mnt/output/result.csv"
 
 class Client:
     input_data = None
@@ -15,35 +15,39 @@ class Client:
     local_means = None
     global_means = None
     arr = None
-    m = None
-    n = None
     nobs = None
-    i = None
 
     local_zeros = None
     global_zeros = None
     client_id = None
     uqfactor = None
     global_result = None
+
     result = None
 
     def __init__(self):
         pass
 
-    def read_input(self):
+    def read_input(self, input_name):
+        input_path = f"{INPUT_PATH}{input_name}"
         try:
-            self.input_data = pd.read_csv(INPUT_PATH, header=None)
+            self.input_data = pd.read_csv(input_path, header=None)
         except FileNotFoundError:
-            print(f'File {INPUT_PATH} could not be found.', flush=True)
+            print(f'File {input_path} could not be found.', flush=True)
             exit()
         except Exception as e:
             print(f'File could not be parsed: {e}', flush=True)
             exit()
 
     def write_results(self):
-        f = open(OUTPUT_PATH, "a")
-        f.write(str(self.result))
-        f.close()
+#        f = open(OUTPUT_PATH, "a")
+#        if(self.colnames != None):
+#            f.write(str(self.colnames))
+#        f.write(str(self.result))
+#        f.close()
+        print(type(self.result))
+        print(self.result)
+        self.result.to_csv(OUTPUT_PATH, header=False, index=False)
 
 #-------------------------------------------------------------------------
 # Quartile Implementation:
@@ -56,66 +60,58 @@ class Client:
         if(isinstance(self.input_data, pd.DataFrame)):
             data = self.input_data.to_numpy()
         
-        try:
-            self.n,self.m = data.shape
-        except ValueError:
-            print("Error in Quantile function: The input matrix has too few rows or columns.")
-            exit()
+        n, m = data.shape
           
-        self.arr = np.zeros((self.n,self.m))
-        for i in range(self.m):
+        self.arr = np.zeros((n,m))
+        for i in range(m):
             self.arr[:,i] = data[:,i].astype(np.float64)
             
-        if self.n == 1:
+        if n == 1:
             mean = np.mean(self.arr)
-            return np.array(self.m * [mean])
-        if self.m == 1:
-            return self.arr
+            self.local_means = np.array(m * [mean])
+            return
+        if m == 1:
+            self.local_means = self.arr
+            return
         
-        Ix = np.empty((self.n,self.m))
-        Ix[:] = np.nan
-        Sort = Ix.copy()
+        Sort = np.empty((n,m))
+        Sort[:] = np.nan
         
-        nobs = np.array(self.m * [self.n])
-        i = np.arange(self.n)/(self.n-1)
+        nobs = np.array(m * [n])
+        i = np.arange(n)/(n-1)
         
-        for j in range(self.m):
-            six = np.sort(self.arr[:,j])
-            x = self.arr[:,j]
-            x = x[~(np.isnan(x))]
-            temp = x.argsort()
-            siix = np.empty_like(temp)
-            siix[temp] = np.arange(len(x))
+        for j in range(m):
+            col = np.sort(self.arr[:,j])
             
-            nobsj = six.size - np.count_nonzero(np.isnan(six))
-            if nobsj < self.n:
+            nobsj = len(col) - np.count_nonzero(np.isnan(col))
+            if nobsj < n:
                 nobs[j] = nobsj
-                six = six[~(np.isnan(six))]
-                isna = np.isnan(self.arr[:,j])
-                f = scipy.interpolate.interp1d((np.arange(nobsj)/(nobsj-1)), six)
+                col = col[~(np.isnan(col))]
+                f = scipy.interpolate.interp1d((np.arange(nobsj)/(nobsj-1)), col)
                 Sort[:,j] = f(i)
-                Ix[~isna,j] = ((np.arange(self.n))[~isna])[siix]
             else:
-                Sort[:,j] = six
-                Ix[:,j] = siix
+                Sort[:,j] = col
 
         self.nobs = nobs
-        self.i = i
 
         self.local_means = np.mean(Sort, axis=1)
         print(f'Local means vector: {self.local_means}', flush=True)
 
     #Calculates the result of the normalization.
     def q_compute_local_result(self):
-        for j in range(self.m):
+        n,m = self.arr.shape
+        i = np.arange(n)/(n-1)
+
+        for j in range(m):
             r = rankdata(self.arr[:,j], method='average')
-            if(self.nobs[j] < self.n):
+            f = scipy.interpolate.interp1d(i, self.global_means)
+            if(self.nobs[j] < n):
                 isna = np.isnan(self.arr[:,j])
-                f = scipy.interpolate.interp1d(self.i, self.global_means)
+                #f = scipy.interpolate.interp1d(i, self.global_means)
                 self.arr[~isna,j] = f((r[~isna]-1)/(self.nobs[j]-1))
             else:
-                f = scipy.interpolate.interp1d(self.i, self.global_means)
-                self.arr[:,j] = f((r-1)/(self.n-1))
+                #f = scipy.interpolate.interp1d(i, self.global_means)
+                self.arr[:,j] = f((r-1)/(n-1))
 
         self.result = pd.DataFrame(self.arr)
 
@@ -144,9 +140,12 @@ class Client:
         self.input_data.drop(axis=1, index=self.global_zeros, inplace=True)
         
         n,m = self.input_data.shape
-        if n == 1:
-            print("Error in Upper Quartile function: There are too few lines left after removing the zeros.")
-            exit()
+        if n== 0 or n == 1:
+            self.uqfactor = np.array(m * [1])
+            return
+        if m == 1:
+            self.uqfactor = 1
+            return
 
         data = pd.DataFrame(np.sort(self.input_data,axis=0))
         self.client_id = client_id
