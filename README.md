@@ -12,8 +12,8 @@ Example:
 1,3,8,2  
 
 * A config.yml file to customize some things (see below the possibilities):  
-  * which normalization method you want to use  
-  * which name the input file has
+ * which normalization method you want to use  
+ * which name the input file has
 
 
 ## Output

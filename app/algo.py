@@ -40,13 +40,6 @@ class Client:
             exit()
 
     def write_results(self):
-#        f = open(OUTPUT_PATH, "a")
-#        if(self.colnames != None):
-#            f.write(str(self.colnames))
-#        f.write(str(self.result))
-#        f.close()
-        print(type(self.result))
-        print(self.result)
         self.result.to_csv(OUTPUT_PATH, header=False, index=False)
 
 #-------------------------------------------------------------------------
@@ -94,7 +87,7 @@ class Client:
 
         self.nobs = nobs
 
-        self.local_means = np.mean(Sort, axis=1)
+        self.local_means = [m, np.sum(Sort, axis=1)]
         print(f'Local means vector: {self.local_means}', flush=True)
 
     #Calculates the result of the normalization.
@@ -107,10 +100,8 @@ class Client:
             f = scipy.interpolate.interp1d(i, self.global_means)
             if(self.nobs[j] < n):
                 isna = np.isnan(self.arr[:,j])
-                #f = scipy.interpolate.interp1d(i, self.global_means)
                 self.arr[~isna,j] = f((r[~isna]-1)/(self.nobs[j]-1))
             else:
-                #f = scipy.interpolate.interp1d(i, self.global_means)
                 self.arr[:,j] = f((r-1)/(n-1))
 
         self.result = pd.DataFrame(self.arr)
@@ -175,12 +166,9 @@ class Coordinator(Client):
     #Aggregates the mean values of the clients.
     def q_compute_global_means(self, local_means):
         np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
-        try:
-            global_means = np.sum(local_means,axis=0)/len(local_means)
-        except ValueError:
-            print("Error in Quantile function: The input matrices of all clients must have the same number of rows.")
-            exit()   
-        return global_means
+        local_means = np.sum(local_means,axis=0)
+        return local_means[1]/local_means[0]
+        
     
     #Collects the zero lines of the clients and 
     #reduces them to the lines that are present in each client.
@@ -189,13 +177,21 @@ class Coordinator(Client):
     
     #Calculates the global result
     def uq_compute_global_result(self,total_dict):
+        np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
         keys = list(total_dict.keys())
         result = []
+        nosamples = []
         for k in keys:
-            result.append(total_dict.get(k))
+            result = np.concatenate((result, total_dict.get(k)),axis=None)
+            nosamples.append(len(total_dict.get(k)))
         result = result/(np.exp(np.mean(np.log(result))))
+        n = 0
         for i in range(len(total_dict)):
-            total_dict[keys[i]] = result[i]
+            local_dict = []
+            for j in range(n,n + nosamples[i]):
+                local_dict.append(result[j])
+            total_dict[keys[i]] = local_dict
+            n += nosamples[i]
         return total_dict
 
 
