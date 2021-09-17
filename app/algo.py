@@ -43,7 +43,7 @@ class Client:
         self.result.to_csv(OUTPUT_PATH, header=False, index=False)
 
 #-------------------------------------------------------------------------
-# Quartile Implementation:
+# Quantile Implementation:
 
     #Prepares the calculation of the quantiles. calculates the mean vector of the client.
     #The implementation is based on the implementation of the 

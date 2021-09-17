@@ -1,0 +1,3 @@
+uq_q_normalization:
+        normalization: upper quartile
+        input_filename: client4_tcg_raw.csv

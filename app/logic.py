@@ -14,6 +14,8 @@ class AppLogic:
 
     def __init__(self):
         # === Status of this app instance ===
+        self.start = 0
+        self.start_proc = 0
 
         # Indicates whether there is data to share, if True make sure self.data_out is available
         self.status_available = False
@@ -46,6 +48,8 @@ class AppLogic:
         #self.gene_names = None
 
     def handle_setup(self, client_id, coordinator, clients):
+        self.start = time.time()
+        self.start_proc = time.process_time()
         # This method is called once upon startup and contains information about the execution context of this instance
         self.id = client_id
         self.coordinator = coordinator
@@ -56,6 +60,7 @@ class AppLogic:
 
         self.thread = threading.Thread(target=self.app_flow)
         self.thread.start()
+        
 
     def handle_incoming(self, data):
         # This method is called when new data arrives
@@ -161,7 +166,7 @@ class AppLogic:
                 self.progress = 'global aggregation...'
                 if len(self.data_incoming) == len(self.clients):
                     if self.mode == "quantile":
-                        local_means = [jsonpickle.decode(client_data) for client_data in self.data_incoming]                   
+                        local_means = [jsonpickle.decode(client_data) for client_data in self.data_incoming]             
                         global_means = self.client.q_compute_global_means(local_means)
                         self.client.q_set_global_means(global_means)
                         data_to_broadcast = jsonpickle.encode(global_means)
@@ -240,11 +245,18 @@ class AppLogic:
                 print("Finishing", flush=True)
                 self.progress = 'finishing...'
                 if self.coordinator:
+                    end = time.time()
+                    end_proc = time.process_time()
+                    print('total time: {:5.3f}s'.format(end-self.start))
+                    print('proc time: {:5.3f}s'.format(end_proc-self.start_proc))
                     time.sleep(10)
                 self.status_finished = True
                 break
 
             time.sleep(1)
-
+        end = time.time()
+        end_proc = time.process_time()
+        print('total time: {:5.3f}s'.format(end-self.start))
+        print('proc time: {:5.3f}s'.format(end_proc-self.start_proc))
 
 logic = AppLogic()
