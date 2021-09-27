@@ -3,6 +3,7 @@ import pandas as pd
 import threading
 import time
 import yaml
+import numpy as np
 
 from app.algo import Coordinator, Client
 from distutils import dir_util
@@ -14,9 +15,6 @@ class AppLogic:
 
     def __init__(self):
         # === Status of this app instance ===
-        self.start = 0
-        self.start_proc = 0
-
         # Indicates whether there is data to share, if True make sure self.data_out is available
         self.status_available = False
 
@@ -38,19 +36,24 @@ class AppLogic:
         self.progress = 'not started yet'
 
         # === Custom ===
-        self.INPUT_DIR = "/mnt/input"
-        self.OUTPUT_DIR = "/mnt/output"
+        self.INPUT_DIR = "/mnt/input/"
+        self.OUTPUT_DIR = "/mnt/output/"
 
         self.client = None
         self.mode = None
         self.input_name = None
-        #self.sample_names = None
-        #self.gene_names = None
+        self.sample_names = None
+        self.gene_names = None
+        self.sep = None
+        self.output_normfac = False
+        self.output_name = None
 
+        self.samples = None
+        self.genes = None
+        self.colsrows = False
+
+    # This method is called once upon startup and contains information about the execution context of this instance
     def handle_setup(self, client_id, coordinator, clients):
-        self.start = time.time()
-        self.start_proc = time.process_time()
-        # This method is called once upon startup and contains information about the execution context of this instance
         self.id = client_id
         self.coordinator = coordinator
         self.clients = clients
@@ -78,10 +81,17 @@ class AppLogic:
         with open("/mnt/input/config.yml") as f:
             config = yaml.load(f, Loader=yaml.FullLoader)[APP_NAME]
 
-            self.mode = config.get("normalization", "upper quartile")
-            self.input_name = config.get("input_filename", "data.csv")
-            #self.sample_names = config.get("sample_names")
-            #self.gene_names = config.get("gene_names")
+            self.mode = config.get("normalization")
+
+            self.input_name = config.get("input_filename", "data.csv")  
+            self.colsrows = config.get("sample_genes_in_input", False)
+
+            self.output_normfac = config.get("normfactors", False)
+            self.output_name = config.get("output_filename", "result.csv")
+            self.sample_names = config.get("sample_names", None)
+            self.gene_names = config.get("gene_names", None)
+
+            self.sep = config.get("seperator", ",")
 
     def app_flow(self):
         # This method contains a state machine for the client and coordinator instance
@@ -103,6 +113,22 @@ class AppLogic:
         state = state_initializing
         self.progress = 'initializing...'
 
+        printcols = False
+        printrows = False
+        if self.sample_names is not None:
+            colpath = f"{self.INPUT_DIR}{self.sample_names}"
+            with open(colpath,"r") as tf:
+                self.samples = tf.read().splitlines()
+            printcols = True
+        if self.gene_names is not None:
+            rowpath = f"{self.INPUT_DIR}{self.gene_names}"
+            with open(rowpath,"r") as tf:
+                self.genes = tf.read().splitlines()
+            printrows = True
+        if (self.colsrows):
+            printcols = True
+            printrows = True
+
         while True:
             if state == state_initializing:
                 print("Initializing", flush=True)
@@ -116,7 +142,7 @@ class AppLogic:
             if state == state_read_input:
                 print("Read input", flush=True)
                 self.progress = 'read input'
-                self.client.read_input(self.input_name)
+                self.client.read_input(self.input_name,self.sep,self.samples,self.genes,self.colsrows)
                 state = state_local_computation
 
             if state == state_local_computation:
@@ -133,6 +159,9 @@ class AppLogic:
                     self.client.uq_compute_local_zeros()
                 
                     data_to_send = jsonpickle.encode(self.client.local_zeros)
+                else:
+                    print("ERROR: there was no normalization method given in config.yml")
+                    exit()
 
                 if self.coordinator:
                     self.data_incoming.append(data_to_send)
@@ -191,8 +220,8 @@ class AppLogic:
                     state = state_writing_results
                 elif self.mode == "upper quartile":
                     print("Calculating local norm factors..", flush=True)
-                    self.client.uq_compute_uqfactor(self.id)
-                    data_to_send = jsonpickle.encode(self.client.uqfactor)
+                    self.client.uq_compute_uquartile()
+                    data_to_send = jsonpickle.encode(self.client.uquartile)
 
                     if self.coordinator:
                         self.data_incoming.append(data_to_send)
@@ -217,10 +246,9 @@ class AppLogic:
                 print("Global computation of the result", flush=True)
                 self.progress = 'global result computation...'
                 if len(self.data_incoming) == len(self.clients):
-                    #local_result = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
-                    local_result = {}
+                    local_result = []
                     for client_data in self.data_incoming:
-                        local_result.update(jsonpickle.decode(client_data))
+                        local_result = np.append(local_result,jsonpickle.decode(client_data))
                     self.data_incoming = []
                     global_result = self.client.uq_compute_global_result(local_result)
                     self.client.uq_set_global_result(global_result)
@@ -238,25 +266,19 @@ class AppLogic:
             if state == state_writing_results:
                 print("Writing results", flush=True)
                 # now you can save it to a file
-                self.client.write_results()
+                self.client.write_results(self.output_name, printcols, printrows)
+                if self.mode == "upper quartile" and self.output_normfac:
+                    self.client.write_normfac("normfactor.csv", self.samples)
                 state = state_finishing
 
             if state == state_finishing:
                 print("Finishing", flush=True)
                 self.progress = 'finishing...'
                 if self.coordinator:
-                    end = time.time()
-                    end_proc = time.process_time()
-                    print('total time: {:5.3f}s'.format(end-self.start))
-                    print('proc time: {:5.3f}s'.format(end_proc-self.start_proc))
                     time.sleep(10)
                 self.status_finished = True
                 break
 
             time.sleep(1)
-        end = time.time()
-        end_proc = time.process_time()
-        print('total time: {:5.3f}s'.format(end-self.start))
-        print('proc time: {:5.3f}s'.format(end_proc-self.start_proc))
 
 logic = AppLogic()

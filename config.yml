@@ -1,3 +1,0 @@
-uq_q_normalization:
-        normalization: upper quartile
-        input_filename: "client.csv"

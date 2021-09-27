@@ -7,7 +7,7 @@ from scipy.stats import rankdata
 from scipy import interpolate
 
 INPUT_PATH = "/mnt/input/"
-OUTPUT_PATH = "/mnt/output/result.csv"
+OUTPUT_PATH = "/mnt/output/"
 
 class Client:
     input_data = None
@@ -19,28 +19,43 @@ class Client:
 
     local_zeros = None
     global_zeros = None
-    client_id = None
-    uqfactor = None
-    global_result = None
+    uquartile = None
+    scalingfactor = None
+    normfac = None
 
     result = None
 
     def __init__(self):
         pass
 
-    def read_input(self, input_name):
+    def read_input(self, input_name, sep, sample_names = None, gene_names = None, sample_genes_in_input = False):
         input_path = f"{INPUT_PATH}{input_name}"
         try:
-            self.input_data = pd.read_csv(input_path, header=None)
+            if (sample_genes_in_input):
+                self.input_data = pd.read_csv(input_path, sep=sep, index_col = 0)
+            else:
+                self.input_data = pd.read_csv(input_path, sep=sep, header=None)
         except FileNotFoundError:
-            print(f'File {input_path} could not be found.', flush=True)
+            print(f'ERROR: File {input_path} could not be found.', flush=True)
             exit()
         except Exception as e:
-            print(f'File could not be parsed: {e}', flush=True)
+            print(f'ERROR: File could not be parsed: {e}', flush=True)
             exit()
+        if sample_names is not None:
+            self.input_data.columns = sample_names
+        if gene_names is not None:        
+            self.input_data.index = gene_names
 
-    def write_results(self):
-        self.result.to_csv(OUTPUT_PATH, header=False, index=False)
+    def write_results(self,output_name,col=False,row=False):
+        output_path = f"{OUTPUT_PATH}{output_name}"
+        self.result.to_csv(output_path, header=col, index=row)
+
+    def write_normfac(self,normfac_file, sample_names=None):
+        path = f"{OUTPUT_PATH}{normfac_file}"
+        if sample_names is not None:
+            pd.Series(self.normfac, index=sample_names).to_csv(path, header=False, index=True)
+        else:
+            pd.Series(self.normfac).to_csv(path, header=False, index=False)
 
 #-------------------------------------------------------------------------
 # Quantile Implementation:
@@ -53,19 +68,23 @@ class Client:
         if(isinstance(self.input_data, pd.DataFrame)):
             data = self.input_data.to_numpy()
         
-        n, m = data.shape
+        n, m = self.input_data.shape
           
         self.arr = np.zeros((n,m))
         for i in range(m):
             self.arr[:,i] = data[:,i].astype(np.float64)
-            
-        if n == 1:
-            mean = np.mean(self.arr)
-            self.local_means = np.array(m * [mean])
-            return
+         
         if m == 1:
-            self.local_means = self.arr
+            print("ERROR in Quantile function: There must be more than one sample in the data.", flush=True)
+            exit()
+        if n == 1:
+            if np.any(np.isnan(self.arr)):
+                self.arr = self.arr[~np.isnan(self.arr)]
+                m = m - np.count_nonzero(np.isnan(self.arr))
+                print("WARNING in Quantile function: The samples with NaN values are removed.", flush=True)
+            self.local_means = [m, np.sum(self.arr)]
             return
+        
         
         Sort = np.empty((n,m))
         Sort[:] = np.nan
@@ -88,11 +107,15 @@ class Client:
         self.nobs = nobs
 
         self.local_means = [m, np.sum(Sort, axis=1)]
-        print(f'Local means vector: {self.local_means}', flush=True)
+        #print(f'Local means vector: {self.local_means}', flush=True)
 
     #Calculates the result of the normalization.
     def q_compute_local_result(self):
         n,m = self.arr.shape
+
+        if n == 1:
+            self.result = pd.DataFrame(np.array(m * [self.global_means])).T
+            return
         i = np.arange(n)/(n-1)
 
         for j in range(m):
@@ -109,7 +132,7 @@ class Client:
     #Set the global means vector.
     def q_set_global_means(self, global_means):
         self.global_means = global_means
-        print(f'Global means vector: {self.global_means}', flush=True)
+        #print(f'Global means vector: {self.global_means}', flush=True)
 
 #---------------------------------------------------------------------------
 # Upper Quartile Implementation
@@ -117,49 +140,45 @@ class Client:
     #Checks which lines of the client's input_data are completely zero.
     def uq_compute_local_zeros(self):
         if(self.input_data.isnull().values.any()):
-            print("Error in Upper Quartile function: the function can't handle NaNs in input data.", flush=True)
+            print("ERROR in Upper Quartile function: the function can't handle NaNs in input data.", flush=True)
             exit()
         all_zero = self.input_data.eq(0).all(axis=1)
         self.local_zeros = np.where(all_zero)[0]
-        print(f'Local zeros of this client in lines: {self.local_zeros}', flush=True)
+        #print(f'Local zeros of this client in lines: {self.local_zeros}', flush=True)
 
     #Calculates for each sample of the client the upper quartile by library size factor (uqfactor).
     #The implementation is based on the implementation of the 
     #calcNormFactors method in bioconductor edgeR. 
     #Robinson and Smyth, 2020
-    def uq_compute_uqfactor(self, client_id):
-        self.input_data.drop(axis=1, index=self.global_zeros, inplace=True)
+    def uq_compute_uquartile(self):
+        indexes_to_keep = set(range(self.input_data.shape[0])) - set(self.global_zeros)
+        data = self.input_data.take(list(indexes_to_keep))
         
-        n,m = self.input_data.shape
-        if n== 0 or n == 1:
-            self.uqfactor = np.array(m * [1])
-            return
-        if m == 1:
-            self.uqfactor = 1
+        n,m = data.shape
+        if n == 1:
+            print("WARNING in Upper Quartile function: if there is only one gene in matrix, the upper quartile will set to 1.", flush=True)
+            self.uquartile = np.array(m * [1])
             return
 
-        data = pd.DataFrame(np.sort(self.input_data,axis=0))
-        self.client_id = client_id
+        data = pd.DataFrame(np.sort(data,axis=0))
     
-        lib_size = np.array(data.sum(axis=0).tolist())
-        uquartile = np.quantile(data,0.75,axis=0)
-        self.uqfactor = {client_id: uquartile/lib_size}
-        print(f'Local result: {self.uqfactor}', flush=True)
+        self.uquartile = np.quantile(data,0.75,axis=0)
+        #print(f'Local result: {self.uquartile}', flush=True)
 
     #Compute the local result.
     def uq_compute_local_result(self):
-        norm_factors = self.global_result[self.client_id]
-        self.result = self.input_data/norm_factors
+        self.normfac = self.uquartile/self.scalingfactor
+        self.result = self.input_data/self.normfac
 
     #Set the global zeros vector.
     def uq_set_global_zeros(self, global_zeros):
         self.global_zeros = global_zeros
-        print(f'Global zeros in lines: {self.global_zeros}', flush=True)
+        #print(f'Global zeros in lines: {self.global_zeros}', flush=True)
 
-    #Set the global Norm Factor Vector.
+    #Set the global Scaling Factor.
     def uq_set_global_result(self, global_result):
-        self.global_result = global_result
-        print(f'Global result: {self.global_result}', flush=True)
+        self.scalingfactor = global_result
+        #print(f'Scaling factor: {self.scalingfactor}', flush=True)
 
 
 class Coordinator(Client):
@@ -176,23 +195,8 @@ class Coordinator(Client):
         return reduce(np.intersect1d, local_zeros)
     
     #Calculates the global result
-    def uq_compute_global_result(self,total_dict):
-        np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
-        keys = list(total_dict.keys())
-        result = []
-        nosamples = []
-        for k in keys:
-            result = np.concatenate((result, total_dict.get(k)),axis=None)
-            nosamples.append(len(total_dict.get(k)))
-        result = result/(np.exp(np.mean(np.log(result))))
-        n = 0
-        for i in range(len(total_dict)):
-            local_dict = []
-            for j in range(n,n + nosamples[i]):
-                local_dict.append(result[j])
-            total_dict[keys[i]] = local_dict
-            n += nosamples[i]
-        return total_dict
+    def uq_compute_global_result(self,local_uquartile):
+        return np.exp(np.mean(np.log(local_uquartile)))
 
 
 

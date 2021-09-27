@@ -1,0 +1,12 @@
+uq_q_normalization:      
+    input_filename: client.csv
+    sample_genes_in_input: False
+
+    normfactors: True
+    sample_names: colclient.txt
+    gene_names: rowclient.txt
+    output_filename: result.csv
+
+    seperator: ','
+    
+    normalization: upper quartile
