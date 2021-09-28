@@ -1,3 +1,0 @@
-uq_q_normalization:
-        normalization: quantile
-        input_filename: client9_tcg_raw.csv
