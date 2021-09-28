@@ -1,0 +1,9 @@
+uq_q_normalization:
+    input_filename: A7.counts.tsv
+    sample_genes_in_input: True
+
+    output_filename: resA7.csv
+
+    seperator: '\t'
+    
+    normalization: quantile

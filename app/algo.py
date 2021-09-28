@@ -11,6 +11,8 @@ OUTPUT_PATH = "/mnt/output/"
 
 class Client:
     input_data = None
+    sample_names = None
+    gene_names = None
 
     local_means = None
     global_means = None
@@ -45,9 +47,15 @@ class Client:
             self.input_data.columns = sample_names
         if gene_names is not None:        
             self.input_data.index = gene_names
+        if(sample_genes_in_input):
+            sample_names = list(self.input_data.columns)
+            gene_names = list(self.input_data.index)
+        self.sample_names = sample_names
+        self.gene_names = gene_names
 
     def write_results(self,output_name,col=False,row=False):
         output_path = f"{OUTPUT_PATH}{output_name}"
+        print(self.result.head(5))
         self.result.to_csv(output_path, header=col, index=row)
 
     def write_normfac(self,normfac_file, sample_names=None):
@@ -127,7 +135,7 @@ class Client:
             else:
                 self.arr[:,j] = f((r-1)/(n-1))
 
-        self.result = pd.DataFrame(self.arr)
+        self.result = pd.DataFrame(self.arr, index=self.gene_names, columns=self.sample_names)
 
     #Set the global means vector.
     def q_set_global_means(self, global_means):

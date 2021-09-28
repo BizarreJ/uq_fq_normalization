@@ -1,0 +1,9 @@
+uq_q_normalization:      
+    input_filename: client1.csv
+    
+    normfactors: True
+    output_filename: res01.csv
+    
+    seperator: ','
+
+    normalization: upper quartile

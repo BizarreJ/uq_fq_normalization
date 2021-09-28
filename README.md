@@ -5,8 +5,8 @@ A Normalization FeatureCloud App, allowing to perform Quantile (Q) or Upper Quar
 The app produces results very similar to those of `calcNormFactors(input_matrix, method = "upperquartile")` in the Bioconductor edgeR package of Bullard et al. [0] and `normalizeBetweenArrays(input_matrix, method="quantile")` in the Bioconductor limma package of Bolstat et al. [1].  
 Note: the upper quartile method cannot handle NaNs in the input data. if NaNs are present in the input data, the quantile method should be used.
 
-[0] Bullard JH, Purdom E, Hansen KD, Dudoit S. (2010) Evaluation of statistical methods for normalization and differential expression in mRNA-Seq experiments. BMC Bioinformatics 11, 94.  
-[1] Bolstad, B. M., Irizarry R. A., Astrand, M., and Speed, T. P. (2003), A comparison of normalization methods for high density oligonucleotide array data based on bias and variance. Bioinformatics 19, 185-193. 
+[0] Bullard JH, Purdom E, Hansen KD, Dudoit S. (2010) Evaluation of statistical methods for normalization and differential expression in mRNA-Seq experiments. BMC Bioinformatics 11, 94. https://rdrr.io/bioc/edgeR/man/calcNormFactors.html  
+[1] Bolstad, B. M., Irizarry R. A., Astrand, M., and Speed, T. P. (2003), A comparison of normalization methods for high density oligonucleotide array data based on bias and variance. Bioinformatics 19, 185-193. https://rdrr.io/bioc/limma/man/normalizebetweenarrays.html
 
 ## Config
 For an example config file look at the `sampleconfig.yml` in this directory.
