@@ -55,7 +55,7 @@ class Client:
 
     def write_results(self,output_name,col=False,row=False):
         output_path = f"{OUTPUT_PATH}{output_name}"
-        print(self.result.head(5))
+        #print(self.result.head(5))
         self.result.to_csv(output_path, header=col, index=row)
 
     def write_normfac(self,normfac_file, sample_names=None):

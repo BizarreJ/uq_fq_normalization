@@ -95,7 +95,6 @@ class AppLogic:
 
     def app_flow(self):
         # This method contains a state machine for the client and coordinator instance
-
         # === States ===
         state_initializing = 1
         state_read_input = 2
@@ -278,7 +277,7 @@ class AppLogic:
                     time.sleep(10)
                 self.status_finished = True
                 break
-
+            
             time.sleep(1)
 
 logic = AppLogic()
